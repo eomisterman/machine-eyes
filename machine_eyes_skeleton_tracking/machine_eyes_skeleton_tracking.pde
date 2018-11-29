@@ -52,50 +52,48 @@ private void setupOpenNI() {
   context.setMirror(false);
 }
 
-private void setupOpenNI_CameraImageMode()
-{
-    println("kCameraImageMode " + kCameraImageMode);
+private void setupOpenNI_CameraImageMode() {
+  println("kCameraImageMode " + kCameraImageMode);
 
-    switch (kCameraImageMode) {
-    case 1: // kCameraImage_RGB:
-        context.enableRGB();
-        println("enable RGB");
-        break;
-    case 2: // kCameraImage_IR:
-        context.enableIR();
-        println("enable IR");
-        break;
-    case 3: // kCameraImage_Depth:
-        context.enableDepth();
-        println("enable Depth");
-        break;
-    case 4: // kCameraImage_User:
-        context.enableUser();
-        println("enable User");
-        break;
-    }
+  switch (kCameraImageMode) {
+  case 1: // kCameraImage_RGB:
+    context.enableRGB();
+    println("enable RGB");
+    break;
+  case 2: // kCameraImage_IR:
+    context.enableIR();
+    println("enable IR");
+    break;
+  case 3: // kCameraImage_Depth:
+    context.enableDepth();
+    println("enable Depth");
+    break;
+  case 4: // kCameraImage_User:
+    context.enableUser();
+    println("enable User");
+    break;
+  }
 }
 
-private void OpenNI_DrawCameraImage()
-{
-    switch (kCameraImageMode) {
-    case 1: // kCameraImage_RGB:
-        canvas.image(context.rgbImage(), 0, 0);
-        // println("draw RGB");
-        break;
-    case 2: // kCameraImage_IR:
-        canvas.image(context.irImage(), 0, 0);
-        // println("draw IR");
-        break;
-    case 3: // kCameraImage_Depth:
-        canvas.image(context.depthImage(), 0, 0);
-        //println("draw DEPTH");
-        break;
-    case 4: // kCameraImage_User:
-        canvas.image(context.userImage(), 0, 0);
-        // println("draw DEPTH");
-        break;
-    }
+private void OpenNI_DrawCameraImage() {
+  switch (kCameraImageMode) {
+  case 1: // kCameraImage_RGB:
+    canvas.image(context.rgbImage(), 0, 0);
+    // println("draw RGB");
+    break;
+  case 2: // kCameraImage_IR:
+    canvas.image(context.irImage(), 0, 0);
+    // println("draw IR");
+    break;
+  case 3: // kCameraImage_Depth:
+    canvas.image(context.depthImage(), 0, 0);
+    //println("draw DEPTH");
+    break;
+  case 4: // kCameraImage_User:
+    canvas.image(context.userImage(), 0, 0);
+    // println("draw DEPTH");
+    break;
+  }
 }
 
 // --------------------------------------------------------------------------------
@@ -342,7 +340,7 @@ void drawLimb(int userId, int jointType1, int jointType2) {
   PVector b_2d = new PVector();
   context.convertRealWorldToProjective(b_3d, b_2d);
   
-  println("Right hand joint position: " + Float.toString(b_2d.x) +", "+ Float.toString(b_2d.y));
+//  println("Right hand joint position: " + Float.toString(b_2d.x) +", "+ Float.toString(b_2d.y));
   canvas.line(a_2d.x, a_2d.y, b_2d.x, b_2d.y);
 }
 

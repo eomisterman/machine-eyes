@@ -1,4 +1,7 @@
 import SimpleOpenNI.*;
+import oscP5.*;
+import netP5.*;
+import KinectProjectorToolkit.*;
 
 PGraphics canvas;
 color[] userClr = new color[]
@@ -27,81 +30,33 @@ int kCameraImageMode = kCameraImage_User; // << Set thie value to one of the kCa
 // --------------------------------------------------------------------------------
 //  SKELETON DRAWING
 // --------------------------------------------------------------------------------
-boolean kDrawSkeleton = true; // << set to true to draw skeleton, false to not draw the skeleton
+boolean kDrawSkeleton = false; // << set to true to draw skeleton, false to not draw the skeleton
 
 // --------------------------------------------------------------------------------
 //  OPENNI (KINECT) SUPPORT
 // --------------------------------------------------------------------------------
-import SimpleOpenNI.*;           // import SimpleOpenNI library
 
-SimpleOpenNI context;
+SimpleOpenNI kinect;
 
 private void setupOpenNI() {
-  context = new SimpleOpenNI(this);
-  if (context.isInit() == false) {
+  kinect = new SimpleOpenNI(this);
+  if (kinect.isInit() == false) {
     println("Can't init SimpleOpenNI, maybe the camera is not connected?");
     exit();
     return;   
   }
 
   // Enable depthMapgeneratation
-  context.enableDepth();
-  context.enableUser();
+  kinect.enableDepth();
+  kinect.enableUser();
 
   // Disable mirror
-  context.setMirror(false);
-}
-
-private void setupOpenNI_CameraImageMode() {
-  println("kCameraImageMode " + kCameraImageMode);
-
-  switch (kCameraImageMode) {
-  case 1: // kCameraImage_RGB:
-    context.enableRGB();
-    println("enable RGB");
-    break;
-  case 2: // kCameraImage_IR:
-    context.enableIR();
-    println("enable IR");
-    break;
-  case 3: // kCameraImage_Depth:
-    context.enableDepth();
-    println("enable Depth");
-    break;
-  case 4: // kCameraImage_User:
-    context.enableUser();
-    println("enable User");
-    break;
-  }
-}
-
-private void OpenNI_DrawCameraImage() {
-  switch (kCameraImageMode) {
-  case 1: // kCameraImage_RGB:
-    canvas.image(context.rgbImage(), 0, 0);
-    // println("draw RGB");
-    break;
-  case 2: // kCameraImage_IR:
-    canvas.image(context.irImage(), 0, 0);
-    // println("draw IR");
-    break;
-  case 3: // kCameraImage_Depth:
-    canvas.image(context.depthImage(), 0, 0);
-    //println("draw DEPTH");
-    break;
-  case 4: // kCameraImage_User:
-    canvas.image(context.userImage(), 0, 0);
-    // println("draw DEPTH");
-    break;
-  }
+  kinect.setMirror(false);
 }
 
 // --------------------------------------------------------------------------------
 //  OSC SUPPORT
 // --------------------------------------------------------------------------------
-
-import oscP5.*;
-import netP5.*;
 
 OscP5 oscP5;
 NetAddress oscDestinationAddress;
@@ -122,14 +77,12 @@ private void sendOSCSkeletonPosition(String inAddress, int inUserID, int inJoint
 
   PVector p = new PVector();
 
-  float confidence = context.getJointPositionSkeleton(inUserID, inJointType, p);
+  float confidence = kinect.getJointPositionSkeleton(inUserID, inJointType, p);
 
   // Add coordinates to the message
-  msg.add(confidence);
   msg.add(p.x);
   msg.add(p.y);
   msg.add(p.z);
-  msg.add(inUserID);
 
   // Send OSC message
   oscP5.send(msg, oscDestinationAddress);
@@ -161,53 +114,16 @@ private void sendOSCSkeleton(int inUserID) {
 }
 
 // --------------------------------------------------------------------------------
-//  SYPHON SUPPORT
-// --------------------------------------------------------------------------------
-
-import codeanticode.syphon.*;    // import syphon library
-
-SyphonServer server;     
-
-private void setupSyphonServer(String inServerName)
-{
-  // Create syhpon server to send frames out.
-  server = new SyphonServer(this, inServerName);
-}
-
-// --------------------------------------------------------------------------------
-//  EXIT HANDLER
-// --------------------------------------------------------------------------------
-// called on exit to gracefully shutdown the Syphon server
-private void prepareExitHandler()
-{
-  Runtime.getRuntime().addShutdownHook(
-  new Thread(
-  new Runnable()
-  {
-    public void run () {
-      try {
-        if (server.hasClients()) {
-          server.stop();
-        }
-    } 
-    catch (Exception ex) {
-        ex.printStackTrace(); // not much else to do at this point
-      }
-    }
-  }
-  )
-      );
-}
-
-// --------------------------------------------------------------------------------
 //  MAIN PROGRAM
 // --------------------------------------------------------------------------------
-import KinectProjectorToolkit.*;
+
 
 KinectProjectorToolkit kpc;
 
 void setup() {
+  // Set size of window
   size(640, 480, P3D);
+  // Set size of canvas within window
   canvas = createGraphics(640, 480, P3D);
 
   println("Setup Canvas");
@@ -218,76 +134,79 @@ void setup() {
   canvas.smooth();
   println("-- Canvas Setup Complete");
 
-  // setup Syphon server
-  println("Setup Syphon");
-  setupSyphonServer("Depth");
+//  // setup Syphon server
+//  println("Setup Syphon");
+//  setupSyphonServer("Depth");
 
   // setup Kinect tracking
   println("Setup OpenNI");
   setupOpenNI();
   setupOpenNI_CameraImageMode();
 
-  // setup Kinect Projector Toolkit
-  // kpc = new KinectProjectorToolkit(this, context.depthWidth(), context.depthHeight());
-  // kpc.loadCalibration("/Users/emilio/Documents/Processing/libraries/KinectProjectorToolkit/examples/CALIBRATION/calibration.txt");
+  //  setup Kinect Projector Toolkit
+  kpc = new KinectProjectorToolkit(this, kinect.depthWidth(), kinect.depthHeight());
+  kpc.loadCalibration("/Users/emilio/Documents/Processing/libraries/KinectProjectorToolkit/examples/CALIBRATION/calibration.txt");
 
   // setup OSC
   println("Setup OSC");
   setupOSC();
 
-  // setup the exit handler
-  println("Setup Exit Handler");
-  prepareExitHandler();
+//  // setup the exit handler
+//  println("Setup Exit Handler");
+//  prepareExitHandler();
 }
 
 void draw()
 {
-    // update the cam
-    context.update();
+    // Update the cam
+    kinect.update();
 
     canvas.beginDraw();
 
-    // draw image
+    // Draw depth image from Kinect
     OpenNI_DrawCameraImage();
 
-    // draw the skeleton if it's available
+   // draw the skeleton if true
     if (kDrawSkeleton) {
 
-        int[] userList = context.getUsers();
-        for (int i=0; i<userList.length; i++)
+      int[] userList = kinect.getUsers();
+      for (int i=0; i<userList.length; i++)
+      {
+        if (kinect.isTrackingSkeleton(userList[i]))
         {
-            if (context.isTrackingSkeleton(userList[i]))
-            {
-                canvas.stroke(userClr[ (userList[i] - 1) % userClr.length ] );
+            canvas.stroke(userClr[ (userList[i] - 1) % userClr.length ] );
 
-                drawSkeleton(userList[i]);
+            drawSkeleton(userList[i]);
 
-                if (userList.length == 1) {
-                    sendOSCSkeleton(userList[i]);
-                }
-            }      
-
-            // draw the center of mass
-            if (context.getCoM(userList[i], com))
-            {
-                context.convertRealWorldToProjective(com, com2d);
-
-                canvas.stroke(100, 255, 0);
-                canvas.strokeWeight(1);
-                canvas.beginShape(LINES);
-                canvas.vertex(com2d.x, com2d.y - 5);
-                canvas.vertex(com2d.x, com2d.y + 5);
-                canvas.vertex(com2d.x - 5, com2d.y);
-                canvas.vertex(com2d.x + 5, com2d.y);
-                canvas.endShape();
-
-                canvas.fill(0, 255, 100);
-                canvas.text(Integer.toString(userList[i]), com2d.x, com2d.y);
-//                println("User list " + Integer.toString(i));
-//                println(Integer.toString(userList[i]));
-//                println("Canvas.text print statement:\t" + Integer.toString(userList[i]), com2d.x, com2d.y);
+            if (userList.length == 1) {
+                sendOSCSkeleton(userList[i]);
             }
+        }      
+
+          // draw the center of mass
+        if (kinect.getCoM(userList[i], com))
+        {
+          kinect.convertRealWorldToProjective(com, com2d);
+
+          canvas.stroke(100, 255, 0);
+          canvas.strokeWeight(1);
+          canvas.beginShape(LINES);
+          canvas.vertex(com2d.x, com2d.y - 5);
+          canvas.vertex(com2d.x, com2d.y + 5);
+          canvas.vertex(com2d.x - 5, com2d.y);
+          canvas.vertex(com2d.x + 5, com2d.y);
+          canvas.endShape();
+
+          canvas.fill(0, 255, 100);
+          canvas.text(Integer.toString(userList[i]), com2d.x, com2d.y);
+          println("User list " + Integer.toString(i));
+          println(Integer.toString(userList[i]));
+          println("Canvas.text print statement:\t" + Integer.toString(userList[i]), com2d.x, com2d.y);
         }
+      }
+    } 
+    else {
+      println("NO LONGER IN SKELETON MODE");
     }
 
     canvas.endDraw();
@@ -295,8 +214,13 @@ void draw()
     image(canvas, 0, 0);
 
     // send image to syphon
-    server.sendImage(canvas);
+//    server.sendImage(canvas);
 }
+
+
+// --------------------------------------------------------------------------------
+//  DRAW SKELETON
+// --------------------------------------------------------------------------------
 
 // draw the skeleton with the selected joints
 void drawSkeleton(int userId) {
@@ -326,19 +250,23 @@ void drawSkeleton(int userId) {
   drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);
 }
 
+// --------------------------------------------------------------------------------
+//  DRAW LIMBS
+// --------------------------------------------------------------------------------
+
 void drawLimb(int userId, int jointType1, int jointType2) {
   float  confidence;
 
   // draw the joint position
   PVector a_3d = new PVector();
-  confidence = context.getJointPositionSkeleton(userId, jointType1, a_3d);
+  confidence = kinect.getJointPositionSkeleton(userId, jointType1, a_3d);
   PVector b_3d = new PVector();
-  confidence = context.getJointPositionSkeleton(userId, jointType2, b_3d);
+  confidence = kinect.getJointPositionSkeleton(userId, jointType2, b_3d);
 
   PVector a_2d = new PVector();
-  context.convertRealWorldToProjective(a_3d, a_2d);
+  kinect.convertRealWorldToProjective(a_3d, a_2d);
   PVector b_2d = new PVector();
-  context.convertRealWorldToProjective(b_3d, b_2d);
+  kinect.convertRealWorldToProjective(b_3d, b_2d);
   
 //  println("Right hand joint position: " + Float.toString(b_2d.x) +", "+ Float.toString(b_2d.y));
   canvas.line(a_2d.x, a_2d.y, b_2d.x, b_2d.y);
@@ -367,8 +295,90 @@ void keyPressed()
   switch(key)
   {
   case ' ':
-      context.setMirror(!context.mirror());
+      kinect.setMirror(!kinect.mirror());
       println("Switch Mirroring");
       break;
   }
 }
+
+private void setupOpenNI_CameraImageMode() {
+  println("kCameraImageMode " + kCameraImageMode);
+
+  switch (kCameraImageMode) {
+  case 1: // kCameraImage_RGB:
+    kinect.enableRGB();
+    println("enable RGB");
+    break;
+  case 2: // kCameraImage_IR:
+    kinect.enableIR();
+    println("enable IR");
+    break;
+  case 3: // kCameraImage_Depth:
+    kinect.enableDepth();
+    println("enable Depth");
+    break;
+  case 4: // kCameraImage_User:
+    kinect.enableUser();
+    println("enable User");
+    break;
+  }
+}
+
+private void OpenNI_DrawCameraImage() {
+  switch (kCameraImageMode) {
+  case 1: // kCameraImage_RGB:
+    canvas.image(kinect.rgbImage(), 0, 0);
+    // println("draw RGB");
+    break;
+  case 2: // kCameraImage_IR:
+    canvas.image(kinect.irImage(), 0, 0);
+    // println("draw IR");
+    break;
+  case 3: // kCameraImage_Depth:
+    canvas.image(kinect.depthImage(), 0, 0);
+    //println("draw DEPTH");
+    break;
+  case 4: // kCameraImage_User:
+    canvas.image(kinect.userImage(), 0, 0);
+    // println("draw DEPTH");
+    break;
+  }
+}
+
+//// --------------------------------------------------------------------------------
+////  SYPHON SUPPORT
+//// --------------------------------------------------------------------------------
+//
+//import codeanticode.syphon.*;    // import syphon library
+//
+//SyphonServer server;     
+//
+//private void setupSyphonServer(String inServerName)
+//{
+//  // Create syhpon server to send frames out.
+//  server = new SyphonServer(this, inServerName);
+//}
+
+// --------------------------------------------------------------------------------
+//  EXIT HANDLER
+// --------------------------------------------------------------------------------
+//// called on exit to gracefully shutdown the Syphon server
+//private void prepareExitHandler()
+//{
+//  Runtime.getRuntime().addShutdownHook(
+//    new Thread(
+//      new Runnable() {
+//        public void run () {
+//          try {
+//            if (server.hasClients()) {
+//              server.stop();
+//            }
+//          } 
+//          catch (Exception ex) {
+//            ex.printStackTrace(); // not much else to do at this point
+//          }
+//        }
+//      }
+//    )
+//  );
+//}

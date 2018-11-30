@@ -3,6 +3,193 @@ import oscP5.*;
 import netP5.*;
 import KinectProjectorToolkit.*;
 
+// --------------------------------------------------------------------------------
+//  MAIN PROGRAM
+// --------------------------------------------------------------------------------
+
+KinectProjectorToolkit kpc;
+Eye e1;
+
+void setup() {
+  // Set size of window
+  size(640, 480, P3D);
+  // Set size of canvas within window
+  canvas = createGraphics(640, 480, P3D);
+
+  println("Setup Canvas");
+
+  // canvas.background(200, 0, 0);
+  canvas.stroke(0, 0, 255);
+  canvas.strokeWeight(3);
+  canvas.smooth();
+  println("-- Canvas Setup Complete");
+
+  // setup Kinect tracking
+  println("Setup OpenNI");
+  setupOpenNI();
+  setupOpenNI_CameraImageMode();
+
+  //  setup Kinect Projector Toolkit
+  kpc = new KinectProjectorToolkit(this, kinect.depthWidth(), kinect.depthHeight());
+  kpc.loadCalibration("/Users/emilio/Documents/Processing/libraries/KinectProjectorToolkit/examples/CALIBRATION/calibration.txt");
+
+  // setup OSC
+  println("Setup OSC");
+  setupOSC();
+  
+  e1 = new Eye(290, 100, 120);
+}
+
+void draw()
+{
+    // Update the cam
+    kinect.update();
+
+    canvas.beginDraw();
+
+   // draw the skeleton if true
+    if (kDrawSkeleton) {
+      
+      // Draw depth image from Kinect
+      OpenNI_DrawCameraImage();
+
+      int[] userList = kinect.getUsers();
+      for (int i=0; i<userList.length; i++)
+      {
+        if (kinect.isTrackingSkeleton(userList[i]))
+        {
+            canvas.stroke(userClr[ (userList[i] - 1) % userClr.length ] );
+
+            drawSkeleton(userList[i]);
+
+            if (userList.length == 1) {
+                sendOSCSkeleton(userList[i]);
+            }
+        }      
+
+          // draw the center of mass
+        if (kinect.getCoM(userList[i], com))
+        {
+          kinect.convertRealWorldToProjective(com, com2d);
+
+          canvas.stroke(100, 255, 0);
+          canvas.strokeWeight(1);
+          canvas.beginShape(LINES);
+          canvas.vertex(com2d.x, com2d.y - 5);
+          canvas.vertex(com2d.x, com2d.y + 5);
+          canvas.vertex(com2d.x - 5, com2d.y);
+          canvas.vertex(com2d.x + 5, com2d.y);
+          canvas.endShape();
+
+          canvas.fill(0, 255, 100);
+          canvas.text(Integer.toString(userList[i]), com2d.x, com2d.y);
+          println("User list " + Integer.toString(i));
+          println(Integer.toString(userList[i]));
+          println("Canvas.text print statement:\t" + Integer.toString(userList[i]), com2d.x, com2d.y);
+        }
+      }
+    } 
+    else {
+      int[] userList = kinect.getUsers();
+      for (int i=0; i<userList.length; i++) {
+        
+        if (kinect.getCoM(userList[i], com)) {
+          kinect.convertRealWorldToProjective(com, com2d);
+        }
+        
+        e1.update((int) com2d.x, (int) com2d.y);
+        e1.display(); 
+      } 
+    }
+
+    canvas.endDraw();
+
+    image(canvas, 0, 0);
+}
+
+
+// --------------------------------------------------------------------------------
+//  DRAW SKELETON
+// --------------------------------------------------------------------------------
+
+// draw the skeleton with the selected joints
+void drawSkeleton(int userId) {
+  println("DRAWING SKELETON");
+  canvas.stroke(255, 255, 255, 255);
+  canvas.strokeWeight(3);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_HEAD, SimpleOpenNI.SKEL_NECK);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_LEFT_SHOULDER);
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_LEFT_ELBOW);
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, SimpleOpenNI.SKEL_LEFT_HAND);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_RIGHT_SHOULDER);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_RIGHT_ELBOW);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, SimpleOpenNI.SKEL_RIGHT_HAND);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_LEFT_HIP);
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_HIP, SimpleOpenNI.SKEL_LEFT_KNEE);
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_KNEE, SimpleOpenNI.SKEL_LEFT_FOOT);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_RIGHT_HIP);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_HIP, SimpleOpenNI.SKEL_RIGHT_KNEE);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);
+}
+
+// --------------------------------------------------------------------------------
+//  DRAW LIMBS
+// --------------------------------------------------------------------------------
+
+void drawLimb(int userId, int jointType1, int jointType2) {
+  float  confidence;
+
+  // draw the joint position
+  PVector a_3d = new PVector();
+  confidence = kinect.getJointPositionSkeleton(userId, jointType1, a_3d);
+  PVector b_3d = new PVector();
+  confidence = kinect.getJointPositionSkeleton(userId, jointType2, b_3d);
+
+  PVector a_2d = new PVector();
+  kinect.convertRealWorldToProjective(a_3d, a_2d);
+  PVector b_2d = new PVector();
+  kinect.convertRealWorldToProjective(b_3d, b_2d);
+  
+  canvas.line(a_2d.x, a_2d.y, b_2d.x, b_2d.y);
+}
+
+void onNewUser(SimpleOpenNI curContext, int userId)
+{
+  println("onNewUser - userId: " + userId);
+  println("\tstart tracking skeleton");
+
+  curContext.startTrackingSkeleton(userId);
+}
+
+void onLostUser(SimpleOpenNI curContext, int userId)
+{
+  println("onLostUser - userId: " + userId);
+}
+
+void onVisibleUser(SimpleOpenNI curContext, int userId)
+{
+  //println("onVisibleUser - userId: " + userId);
+}
+
+void keyPressed()
+{
+  switch(key)
+  {
+  case ' ':
+      kinect.setMirror(!kinect.mirror());
+      println("Switch Mirroring");
+      break;
+  }
+}
+
 PGraphics canvas;
 color[] userClr = new color[]
 {
@@ -113,194 +300,6 @@ private void sendOSCSkeleton(int inUserID) {
   sendOSCSkeletonPosition("/right_foot", inUserID, SimpleOpenNI.SKEL_RIGHT_FOOT);
 }
 
-// --------------------------------------------------------------------------------
-//  MAIN PROGRAM
-// --------------------------------------------------------------------------------
-
-
-KinectProjectorToolkit kpc;
-
-void setup() {
-  // Set size of window
-  size(640, 480, P3D);
-  // Set size of canvas within window
-  canvas = createGraphics(640, 480, P3D);
-
-  println("Setup Canvas");
-
-  // canvas.background(200, 0, 0);
-  canvas.stroke(0, 0, 255);
-  canvas.strokeWeight(3);
-  canvas.smooth();
-  println("-- Canvas Setup Complete");
-
-//  // setup Syphon server
-//  println("Setup Syphon");
-//  setupSyphonServer("Depth");
-
-  // setup Kinect tracking
-  println("Setup OpenNI");
-  setupOpenNI();
-  setupOpenNI_CameraImageMode();
-
-  //  setup Kinect Projector Toolkit
-  kpc = new KinectProjectorToolkit(this, kinect.depthWidth(), kinect.depthHeight());
-  kpc.loadCalibration("/Users/emilio/Documents/Processing/libraries/KinectProjectorToolkit/examples/CALIBRATION/calibration.txt");
-
-  // setup OSC
-  println("Setup OSC");
-  setupOSC();
-
-//  // setup the exit handler
-//  println("Setup Exit Handler");
-//  prepareExitHandler();
-}
-
-void draw()
-{
-    // Update the cam
-    kinect.update();
-
-    canvas.beginDraw();
-
-    // Draw depth image from Kinect
-    OpenNI_DrawCameraImage();
-
-   // draw the skeleton if true
-    if (kDrawSkeleton) {
-
-      int[] userList = kinect.getUsers();
-      for (int i=0; i<userList.length; i++)
-      {
-        if (kinect.isTrackingSkeleton(userList[i]))
-        {
-            canvas.stroke(userClr[ (userList[i] - 1) % userClr.length ] );
-
-            drawSkeleton(userList[i]);
-
-            if (userList.length == 1) {
-                sendOSCSkeleton(userList[i]);
-            }
-        }      
-
-          // draw the center of mass
-        if (kinect.getCoM(userList[i], com))
-        {
-          kinect.convertRealWorldToProjective(com, com2d);
-
-          canvas.stroke(100, 255, 0);
-          canvas.strokeWeight(1);
-          canvas.beginShape(LINES);
-          canvas.vertex(com2d.x, com2d.y - 5);
-          canvas.vertex(com2d.x, com2d.y + 5);
-          canvas.vertex(com2d.x - 5, com2d.y);
-          canvas.vertex(com2d.x + 5, com2d.y);
-          canvas.endShape();
-
-          canvas.fill(0, 255, 100);
-          canvas.text(Integer.toString(userList[i]), com2d.x, com2d.y);
-          println("User list " + Integer.toString(i));
-          println(Integer.toString(userList[i]));
-          println("Canvas.text print statement:\t" + Integer.toString(userList[i]), com2d.x, com2d.y);
-        }
-      }
-    } 
-    else {
-      println("NO LONGER IN SKELETON MODE");
-    }
-
-    canvas.endDraw();
-
-    image(canvas, 0, 0);
-
-    // send image to syphon
-//    server.sendImage(canvas);
-}
-
-
-// --------------------------------------------------------------------------------
-//  DRAW SKELETON
-// --------------------------------------------------------------------------------
-
-// draw the skeleton with the selected joints
-void drawSkeleton(int userId) {
-  println("DRAWING SKELETON");
-  canvas.stroke(255, 255, 255, 255);
-  canvas.strokeWeight(3);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_HEAD, SimpleOpenNI.SKEL_NECK);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_LEFT_SHOULDER);
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_LEFT_ELBOW);
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, SimpleOpenNI.SKEL_LEFT_HAND);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_RIGHT_SHOULDER);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_RIGHT_ELBOW);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, SimpleOpenNI.SKEL_RIGHT_HAND);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_LEFT_HIP);
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_HIP, SimpleOpenNI.SKEL_LEFT_KNEE);
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_KNEE, SimpleOpenNI.SKEL_LEFT_FOOT);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_RIGHT_HIP);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_HIP, SimpleOpenNI.SKEL_RIGHT_KNEE);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);
-}
-
-// --------------------------------------------------------------------------------
-//  DRAW LIMBS
-// --------------------------------------------------------------------------------
-
-void drawLimb(int userId, int jointType1, int jointType2) {
-  float  confidence;
-
-  // draw the joint position
-  PVector a_3d = new PVector();
-  confidence = kinect.getJointPositionSkeleton(userId, jointType1, a_3d);
-  PVector b_3d = new PVector();
-  confidence = kinect.getJointPositionSkeleton(userId, jointType2, b_3d);
-
-  PVector a_2d = new PVector();
-  kinect.convertRealWorldToProjective(a_3d, a_2d);
-  PVector b_2d = new PVector();
-  kinect.convertRealWorldToProjective(b_3d, b_2d);
-  
-//  println("Right hand joint position: " + Float.toString(b_2d.x) +", "+ Float.toString(b_2d.y));
-  canvas.line(a_2d.x, a_2d.y, b_2d.x, b_2d.y);
-}
-
-void onNewUser(SimpleOpenNI curContext, int userId)
-{
-  println("onNewUser - userId: " + userId);
-  println("\tstart tracking skeleton");
-
-  curContext.startTrackingSkeleton(userId);
-}
-
-void onLostUser(SimpleOpenNI curContext, int userId)
-{
-  println("onLostUser - userId: " + userId);
-}
-
-void onVisibleUser(SimpleOpenNI curContext, int userId)
-{
-  //println("onVisibleUser - userId: " + userId);
-}
-
-void keyPressed()
-{
-  switch(key)
-  {
-  case ' ':
-      kinect.setMirror(!kinect.mirror());
-      println("Switch Mirroring");
-      break;
-  }
-}
-
 private void setupOpenNI_CameraImageMode() {
   println("kCameraImageMode " + kCameraImageMode);
 
@@ -345,40 +344,3 @@ private void OpenNI_DrawCameraImage() {
   }
 }
 
-//// --------------------------------------------------------------------------------
-////  SYPHON SUPPORT
-//// --------------------------------------------------------------------------------
-//
-//import codeanticode.syphon.*;    // import syphon library
-//
-//SyphonServer server;     
-//
-//private void setupSyphonServer(String inServerName)
-//{
-//  // Create syhpon server to send frames out.
-//  server = new SyphonServer(this, inServerName);
-//}
-
-// --------------------------------------------------------------------------------
-//  EXIT HANDLER
-// --------------------------------------------------------------------------------
-//// called on exit to gracefully shutdown the Syphon server
-//private void prepareExitHandler()
-//{
-//  Runtime.getRuntime().addShutdownHook(
-//    new Thread(
-//      new Runnable() {
-//        public void run () {
-//          try {
-//            if (server.hasClients()) {
-//              server.stop();
-//            }
-//          } 
-//          catch (Exception ex) {
-//            ex.printStackTrace(); // not much else to do at this point
-//          }
-//        }
-//      }
-//    )
-//  );
-//}

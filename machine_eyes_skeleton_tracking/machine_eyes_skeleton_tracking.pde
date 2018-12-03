@@ -101,9 +101,9 @@ void draw()
         }
         
         e1.update((int) com2d.x, (int) com2d.y);
-        e1.display();
+        e1.displayRealEye();
         e2.update((int) com2d.x, (int) com2d.y);
-        e2.display();
+        e2.displayRealEye();
       } 
     }
 

@@ -19,7 +19,7 @@ void setup() {
 
   println("Setup Canvas");
 
-  background(0);
+ // background(0);
   canvas.stroke(0, 0, 255);
   canvas.strokeWeight(3);
   canvas.smooth();
@@ -31,8 +31,8 @@ void setup() {
   setupOpenNI_CameraImageMode();
 
   //  setup Kinect Projector Toolkit
-  kpc = new KinectProjectorToolkit(this, kinect.depthWidth(), kinect.depthHeight());
-  kpc.loadCalibration("/Users/emilio/Documents/Processing/libraries/KinectProjectorToolkit/examples/CALIBRATION/calibration.txt");
+//  kpc = new KinectProjectorToolkit(this, kinect.depthWidth(), kinect.depthHeight());
+//  kpc.loadCalibration("/Users/emilio/Documents/Processing/libraries/KinectProjectorToolkit/examples/CALIBRATION/calibration.txt");
 
   // setup OSC
   println("Setup OSC");
@@ -86,9 +86,9 @@ void draw()
 
           canvas.fill(0, 255, 100);
           canvas.text(Integer.toString(userList[i]), com2d.x, com2d.y);
-          println("User list " + Integer.toString(i));
-          println(Integer.toString(userList[i]));
-          println("Canvas.text print statement:\t" + Integer.toString(userList[i]), com2d.x, com2d.y);
+//          println("User list " + Integer.toString(i));
+//          println(Integer.toString(userList[i]));
+//          println("Canvas.text print statement:\t" + Integer.toString(userList[i]), com2d.x, com2d.y);
         }
       }
     } 
@@ -109,7 +109,8 @@ void draw()
 
     canvas.endDraw();
 
-    image(canvas, 0, 255);
+//    image(canvas, 0, 255);
+    image(canvas, 0, 0);
 }
 
 
@@ -119,7 +120,7 @@ void draw()
 
 // draw the skeleton with the selected joints
 void drawSkeleton(int userId) {
-  println("DRAWING SKELETON");
+ // println("DRAWING SKELETON");
   canvas.stroke(255, 255, 255, 255);
   canvas.strokeWeight(3);
 
@@ -222,7 +223,7 @@ int kCameraImageMode = kCameraImage_User; // << Set thie value to one of the kCa
 // --------------------------------------------------------------------------------
 //  SKELETON DRAWING
 // --------------------------------------------------------------------------------
-boolean kDrawSkeleton = false; // << set to true to draw skeleton, false to use Eye animation
+boolean kDrawSkeleton = true; // << set to true to draw skeleton, false to use Eye animation
 
 // --------------------------------------------------------------------------------
 //  OPENNI (KINECT) SUPPORT

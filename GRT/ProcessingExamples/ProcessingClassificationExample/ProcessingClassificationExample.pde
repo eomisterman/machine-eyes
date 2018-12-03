@@ -182,7 +182,7 @@ private float[] getJointCoordinates(int inUserID) {
   float confidenceRHand = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_RIGHT_HAND, rightHand);
   
   PVector rh2D = new PVector();
-  kinect.converRealWorldToProjective(rightHand, rh2D);`
+//  kinect.converRealWorldToProjective(rightHand, rh2D);
   println("rightHand X: \t" + Float.toString(rh2D.x));  
   
   PVector leftHip = new PVector();

@@ -343,7 +343,7 @@ class GRT{
     OscMessage msg = new OscMessage("/SaveTrainingDatasetToFile");
     msg.add( filename );
     oscP5.send(msg, grtBackend);
-    
+    println("\n\nFilename:\t" + filename + "\nSave success!\n\n");
     return true;
   }
   

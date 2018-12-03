@@ -9,6 +9,7 @@ import KinectProjectorToolkit.*;
 
 KinectProjectorToolkit kpc;
 Eye e1;
+Eye e2;
 
 void setup() {
   // Set size of window
@@ -18,7 +19,7 @@ void setup() {
 
   println("Setup Canvas");
 
-  // canvas.background(200, 0, 0);
+  background(0);
   canvas.stroke(0, 0, 255);
   canvas.strokeWeight(3);
   canvas.smooth();
@@ -38,14 +39,16 @@ void setup() {
   setupOSC();
   
   e1 = new Eye(290, 100, 120);
+  e2 = new Eye(150, 150, 150);
 }
 
 void draw()
 {
     // Update the cam
     kinect.update();
-
+    
     canvas.beginDraw();
+//    background(0);
 
    // draw the skeleton if true
     if (kDrawSkeleton) {
@@ -98,13 +101,15 @@ void draw()
         }
         
         e1.update((int) com2d.x, (int) com2d.y);
-        e1.display(); 
+        e1.display();
+        e2.update((int) com2d.x, (int) com2d.y);
+        e2.display();
       } 
     }
 
     canvas.endDraw();
 
-    image(canvas, 0, 0);
+    image(canvas, 0, 255);
 }
 
 
@@ -217,7 +222,7 @@ int kCameraImageMode = kCameraImage_User; // << Set thie value to one of the kCa
 // --------------------------------------------------------------------------------
 //  SKELETON DRAWING
 // --------------------------------------------------------------------------------
-boolean kDrawSkeleton = false; // << set to true to draw skeleton, false to not draw the skeleton
+boolean kDrawSkeleton = false; // << set to true to draw skeleton, false to use Eye animation
 
 // --------------------------------------------------------------------------------
 //  OPENNI (KINECT) SUPPORT

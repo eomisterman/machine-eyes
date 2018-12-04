@@ -2,6 +2,7 @@ import SimpleOpenNI.*;
 import oscP5.*;
 import netP5.*;
 import KinectProjectorToolkit.*;
+import java.util.*;
 
 // --------------------------------------------------------------------------------
 //  MAIN PROGRAM
@@ -10,6 +11,9 @@ import KinectProjectorToolkit.*;
 KinectProjectorToolkit kpc;
 Eye e1;
 Eye e2;
+// Most recent classification
+int MRC;
+Eye[] eyeList = new Eye[5];
 
 void setup() {
   // Set size of window
@@ -19,7 +23,7 @@ void setup() {
 
   println("Setup Canvas");
 
-  // background(0);
+//  background(0);
   canvas.stroke(0, 0, 255);
   canvas.strokeWeight(3);
   canvas.smooth();
@@ -38,8 +42,10 @@ void setup() {
   println("Setup OSC");
   setupOSC();
 
-  e1 = new Eye(290, 100, 120);
-  e2 = new Eye(150, 150, 150);
+  eyeList[0] = new Eye(290, 100, 120);
+//  e2 = new Eye(150, 150, 150);
+
+
 }
 
 void draw()
@@ -98,11 +104,23 @@ void draw()
       if (kinect.getCoM(userList[i], com)) {
         kinect.convertRealWorldToProjective(com, com2d);
       }
+      
+      if (userList.length == 1) {
+          sendOSCSkeleton(userList[i]);
+      }
+      
+      for(int k=0; k<eyeList.length; k++) {
+        Eye newEye = eyeList[k];
+        newEye.update((int)com2d.x, (int)com2d.y);
+        newEye.displayRealEye();
+      }
 
-      e1.update((int) com2d.x, (int) com2d.y);
-      e1.displayRealEye();
-      e2.update((int) com2d.x, (int) com2d.y);
-      e2.displayRealEye();
+//      e1.update((int) com2d.x, (int) com2d.y);
+//      e1.displayRealEye();
+//      e2.update((int) com2d.x, (int) com2d.y);
+//      e2.displayRealEye();
+
+
     }
   }
 
@@ -263,7 +281,22 @@ private void setupOSC() {
 }
 
 void oscEvent(OscMessage theOscMessage) {
+  int classPrediction;
+  float likelihood;
+  
   println("### received an osc message. with address pattern "+theOscMessage.addrPattern());
+  println(Integer.toString(theOscMessage.get(0).intValue()) + "\t" + Float.toString(theOscMessage.get(1).floatValue()));
+  
+  if(theOscMessage.checkAddrPattern("/Prediction") == true) {
+    classPrediction = theOscMessage.get(0).intValue();
+    likelihood = theOscMessage.get(1).floatValue();
+    
+    if(classPrediction == 4 && likelihood > 0.9) {
+      println("TRIGGER ANIMATION");
+    }
+  }
+  
+  
 }
 
 private void sendOSCSkeletonPosition(String inAddress, int inUserID, int inJointType) {

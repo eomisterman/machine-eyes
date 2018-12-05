@@ -3,17 +3,17 @@ import oscP5.*;
 import netP5.*;
 import KinectProjectorToolkit.*;
 import java.util.*;
+import java.lang.Math;
 
 // --------------------------------------------------------------------------------
 //  MAIN PROGRAM
 // --------------------------------------------------------------------------------
 
 KinectProjectorToolkit kpc;
-Eye e1;
-Eye e2;
-// Most recent classification
-int MRC;
-Eye[] eyeList = new Eye[5];
+int MRC = 1;
+private static ArrayList<Eye> eyeList = new ArrayList<Eye>();
+PVector com = new PVector();
+PVector com2d = new PVector();
 
 void setup() {
   // Set size of window
@@ -23,7 +23,7 @@ void setup() {
 
   println("Setup Canvas");
 
-//  background(0);
+  background(0);
   canvas.stroke(0, 0, 255);
   canvas.strokeWeight(3);
   canvas.smooth();
@@ -42,45 +42,37 @@ void setup() {
   println("Setup OSC");
   setupOSC();
 
-  eyeList[0] = new Eye(290, 100, 120);
-//  e2 = new Eye(150, 150, 150);
+  eyeList.add(new Eye(150, 150, 150));
+  // eyeList[0] = new Eye(290, 100, 120);
+  // eyeList[1] = new Eye(150, 150, 150);
+  //  e2 = new Eye(150, 150, 150);
 
 
 }
 
-void draw()
-{
+void draw() {
   // Update the cam
   kinect.update();
 
   canvas.beginDraw();
-  //    background(0);
+  //background(0);
 
   // draw the skeleton if true
-  if (kDrawSkeleton) {
-
+  if(kDrawSkeleton) {
     // Draw depth image from Kinect
     OpenNI_DrawCameraImage();
-
     int[] userList = kinect.getUsers();
-    for (int i=0; i<userList.length; i++)
-    {
-      if (kinect.isTrackingSkeleton(userList[i]))
-      {
+    for (int i=0; i<userList.length; i++) {
+      if (kinect.isTrackingSkeleton(userList[i])) {
         canvas.stroke(userClr[ (userList[i] - 1) % userClr.length ] );
-
         drawSkeleton(userList[i]);
-
         if (userList.length == 1) {
           sendOSCSkeleton(userList[i]);
         }
       }      
-
       // draw the center of mass
-      if (kinect.getCoM(userList[i], com))
-      {
+      if (kinect.getCoM(userList[i], com)) {
         kinect.convertRealWorldToProjective(com, com2d);
-
         canvas.stroke(100, 255, 0);
         canvas.strokeWeight(1);
         canvas.beginShape(LINES);
@@ -89,46 +81,58 @@ void draw()
         canvas.vertex(com2d.x - 5, com2d.y);
         canvas.vertex(com2d.x + 5, com2d.y);
         canvas.endShape();
-
         canvas.fill(0, 255, 100);
         canvas.text(Integer.toString(userList[i]), com2d.x, com2d.y);
-        //          println("User list " + Integer.toString(i));
-        //          println(Integer.toString(userList[i]));
-        //          println("Canvas.text print statement:\t" + Integer.toString(userList[i]), com2d.x, com2d.y);
       }
     }
-  } else {
+  } 
+  else {
+//    println("Draw function begin");
     int[] userList = kinect.getUsers();
+//    println("Draw function initialized userList[]");
     for (int i=0; i<userList.length; i++) {
-
+//      println("Draw function enters for loop...");
+//      println("Index:\t" + Integer.toString(i));
       if (kinect.getCoM(userList[i], com)) {
         kinect.convertRealWorldToProjective(com, com2d);
+//        println("Convert Real World To Projective executed");
       }
       
       if (userList.length == 1) {
-          sendOSCSkeleton(userList[i]);
-      }
-      
-      for(int k=0; k<eyeList.length; k++) {
-        Eye newEye = eyeList[k];
-        newEye.update((int)com2d.x, (int)com2d.y);
-        newEye.displayRealEye();
+        sendOSCSkeleton(userList[i]);
+//        println("Osc skeleton sent");
       }
 
-//      e1.update((int) com2d.x, (int) com2d.y);
-//      e1.displayRealEye();
-//      e2.update((int) com2d.x, (int) com2d.y);
-//      e2.displayRealEye();
 
-
+    }
+    for(int k=0; k<eyeList.size(); k++) {
+      Eye newEye;
+      newEye = eyeList.get(k);
+      newEye.update((int)com2d.x, (int)com2d.y);
+      newEye.displayRealEye();
     }
   }
 
   canvas.endDraw();
-
   //    image(canvas, 0, 255);
-  image(canvas, 0, 0);
+  // image(canvas, 0, 0);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // --------------------------------------------------------------------------------
@@ -186,15 +190,15 @@ void drawLimb(int userId, int jointType1, int jointType2) {
 
 void onNewUser(SimpleOpenNI curContext, int userId)
 {
-  println("onNewUser - userId: " + userId);
-  println("\tstart tracking skeleton");
+//  println("onNewUser - userId: " + userId);
+//  println("\tstart tracking skeleton");
 
   curContext.startTrackingSkeleton(userId);
 }
 
 void onLostUser(SimpleOpenNI curContext, int userId)
 {
-  println("onLostUser - userId: " + userId);
+//  println("onLostUser - userId: " + userId);
 }
 
 void onVisibleUser(SimpleOpenNI curContext, int userId)
@@ -208,7 +212,7 @@ void keyPressed()
   {
   case ' ':
     kinect.setMirror(!kinect.mirror());
-    println("Switch Mirroring");
+//    println("Switch Mirroring");
     break;
   }
 }
@@ -223,9 +227,6 @@ color[] userClr = new color[]
   color(255, 0, 255), 
   color(0, 255, 255)
 };
-
-PVector com = new PVector();
-PVector com2d = new PVector();
 
 // --------------------------------------------------------------------------------
 //  CAMERA IMAGE SENT VIA SYPHON
@@ -251,7 +252,7 @@ SimpleOpenNI kinect;
 private void setupOpenNI() {
   kinect = new SimpleOpenNI(this);
   if (kinect.isInit() == false) {
-    println("Can't init SimpleOpenNI, maybe the camera is not connected?");
+//    println("Can't init SimpleOpenNI, maybe the camera is not connected?");
     exit();
     return;
   }
@@ -284,19 +285,42 @@ void oscEvent(OscMessage theOscMessage) {
   int classPrediction;
   float likelihood;
   
-  println("### received an osc message. with address pattern "+theOscMessage.addrPattern());
-  println(Integer.toString(theOscMessage.get(0).intValue()) + "\t" + Float.toString(theOscMessage.get(1).floatValue()));
+//  println("### received an osc message. with address pattern "+theOscMessage.addrPattern());
+//  println(Integer.toString(theOscMessage.get(0).intValue()) + "\t" + Float.toString(theOscMessage.get(1).floatValue()));
   
   if(theOscMessage.checkAddrPattern("/Prediction") == true) {
     classPrediction = theOscMessage.get(0).intValue();
     likelihood = theOscMessage.get(1).floatValue();
-    
+//    println("ClassPrediction/MRC:\t" + Integer.toString(classPrediction) + "/" + Integer.toString(MRC));
     if(classPrediction == 4 && likelihood > 0.9) {
-      println("TRIGGER ANIMATION");
+      if(MRC != classPrediction) {
+        println("TRIGGER ANIMATION");
+        int x_coor = (int) (Math.random() * 640);
+        int y_coor = (int) (Math.random() * 480);
+        eyeList.add(new Eye(x_coor, y_coor, 100));
+        MRC = classPrediction;
+      }
     }
+    if(classPrediction == 3 && likelihood > 0.9) {
+      if(MRC != classPrediction) {
+        println("TRIGGER ANIMATION");
+        int x_coor = (int) (Math.random() * 640);
+        int y_coor = (int) (Math.random() * 480);
+        eyeList.add(new Eye(x_coor, y_coor, 100));
+        MRC = classPrediction;
+      }
+    }
+    if(classPrediction == 7 && likelihood > 0.9) {
+      if(MRC != classPrediction) {
+        println("TRIGGER ANIMATION");
+        int x_coor = (int) (Math.random() * 640);
+        int y_coor = (int) (Math.random() * 480);
+        eyeList.add(new Eye(x_coor, y_coor, 100));
+        MRC = classPrediction;
+      }
+    }
+
   }
-  
-  
 }
 
 private void sendOSCSkeletonPosition(String inAddress, int inUserID, int inJointType) {

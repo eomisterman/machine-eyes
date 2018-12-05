@@ -9,21 +9,27 @@ import java.lang.Math;
 //  MAIN PROGRAM
 // --------------------------------------------------------------------------------
 
+boolean kDrawSkeleton = false; // << set to true to draw skeleton, false to use Eye animation
 KinectProjectorToolkit kpc;
 int MRC = 1;
 private static ArrayList<Eye> eyeList = new ArrayList<Eye>();
 PVector com = new PVector();
 PVector com2d = new PVector();
+int dispHeight;
+int dispWidth;
 
 void setup() {
+  dispWidth = displayWidth;
+  dispHeight = displayHeight;
   // Set size of window
-  size(640, 480, P3D);
+  size(dispWidth, dispHeight, P3D);
   // Set size of canvas within window
-  canvas = createGraphics(640, 480, P3D);
+  canvas = createGraphics(dispWidth, dispHeight, P3D);
 
   println("Setup Canvas");
-
-  background(0);
+  if(!kDrawSkeleton) {
+    background(0);
+  }
   canvas.stroke(0, 0, 255);
   canvas.strokeWeight(3);
   canvas.smooth();
@@ -42,12 +48,7 @@ void setup() {
   println("Setup OSC");
   setupOSC();
 
-  eyeList.add(new Eye(150, 150, 150));
-  // eyeList[0] = new Eye(290, 100, 120);
-  // eyeList[1] = new Eye(150, 150, 150);
-  //  e2 = new Eye(150, 150, 150);
-
-
+  eyeList.add(new Eye((int)(Math.random() * dispWidth), (int)(Math.random() * dispHeight), 150));
 }
 
 void draw() {
@@ -114,26 +115,10 @@ void draw() {
   }
 
   canvas.endDraw();
-  //    image(canvas, 0, 255);
-  // image(canvas, 0, 0);
+  if(kDrawSkeleton) {
+    image(canvas, 0, 0); 
+  }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // --------------------------------------------------------------------------------
 //  DRAW SKELETON
@@ -239,11 +224,6 @@ int kCameraImage_User = 4;               // depth image with colored bodies of t
 int kCameraImageMode = kCameraImage_User; // << Set thie value to one of the kCamerImage constants above
 
 // --------------------------------------------------------------------------------
-//  SKELETON DRAWING
-// --------------------------------------------------------------------------------
-boolean kDrawSkeleton = false; // << set to true to draw skeleton, false to use Eye animation
-
-// --------------------------------------------------------------------------------
 //  OPENNI (KINECT) SUPPORT
 // --------------------------------------------------------------------------------
 
@@ -288,37 +268,37 @@ void oscEvent(OscMessage theOscMessage) {
 //  println("### received an osc message. with address pattern "+theOscMessage.addrPattern());
 //  println(Integer.toString(theOscMessage.get(0).intValue()) + "\t" + Float.toString(theOscMessage.get(1).floatValue()));
   
-  if(theOscMessage.checkAddrPattern("/Prediction") == true) {
+  if(theOscMessage.checkAddrPattern("/Prediction") == true && !kDrawSkeleton) {
     classPrediction = theOscMessage.get(0).intValue();
     likelihood = theOscMessage.get(1).floatValue();
 //    println("ClassPrediction/MRC:\t" + Integer.toString(classPrediction) + "/" + Integer.toString(MRC));
-    if(classPrediction == 4 && likelihood > 0.9) {
+    if(true) {
       if(MRC != classPrediction) {
         println("TRIGGER ANIMATION");
-        int x_coor = (int) (Math.random() * 640);
-        int y_coor = (int) (Math.random() * 480);
-        eyeList.add(new Eye(x_coor, y_coor, 100));
+        int x_coor = (int) (Math.random() * (dispWidth-100));
+        int y_coor = (int) (Math.random() * (dispHeight-100));
+        eyeList.add(new Eye(x_coor, y_coor, 200));
         MRC = classPrediction;
       }
     }
-    if(classPrediction == 3 && likelihood > 0.9) {
-      if(MRC != classPrediction) {
-        println("TRIGGER ANIMATION");
-        int x_coor = (int) (Math.random() * 640);
-        int y_coor = (int) (Math.random() * 480);
-        eyeList.add(new Eye(x_coor, y_coor, 100));
-        MRC = classPrediction;
-      }
-    }
-    if(classPrediction == 7 && likelihood > 0.9) {
-      if(MRC != classPrediction) {
-        println("TRIGGER ANIMATION");
-        int x_coor = (int) (Math.random() * 640);
-        int y_coor = (int) (Math.random() * 480);
-        eyeList.add(new Eye(x_coor, y_coor, 100));
-        MRC = classPrediction;
-      }
-    }
+//    if(classPrediction == 3 && likelihood > 0.9) {
+//      if(MRC != classPrediction) {
+//        println("TRIGGER ANIMATION");
+//        int x_coor = (int) (Math.random() * dispWidth);
+//        int y_coor = (int) (Math.random() * dispHeight);
+//        eyeList.add(new Eye(x_coor, y_coor, 100));
+//        MRC = classPrediction;
+//      }
+//    }
+//    if(classPrediction == 7 && likelihood > 0.9) {
+//      if(MRC != classPrediction) {
+//        println("TRIGGER ANIMATION");
+//        int x_coor = (int) (Math.random() * dispWidth);
+//        int y_coor = (int) (Math.random() * dispHeight);
+//        eyeList.add(new Eye(x_coor, y_coor, 100));
+//        MRC = classPrediction;
+//      }
+//    }
 
   }
 }

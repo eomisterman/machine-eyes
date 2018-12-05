@@ -14,7 +14,7 @@ class Eye {
 
   void update(int mx, int my) {
     // if this is flipped when using projector, revert to angle = atan2(my-y, mx-x);
-    angle = atan2(my-y, x-mx);
+    angle = atan2(my-y, mx-x);
 //    println("angle:\t" + Float.toString(angle));
   }
   

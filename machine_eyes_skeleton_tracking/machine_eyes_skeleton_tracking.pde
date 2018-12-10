@@ -9,7 +9,7 @@ import java.lang.Math;
 //  MAIN PROGRAM
 // --------------------------------------------------------------------------------
 
-boolean kDrawSkeleton = false; // << set to true to draw skeleton, false to use Eye animation
+boolean kDrawSkeleton = true; // << set to true to draw skeleton, false to use Eye animation
 KinectProjectorToolkit kpc;
 int MRC = 1;
 private static ArrayList<Eye> eyeList = new ArrayList<Eye>();
@@ -17,6 +17,8 @@ PVector com = new PVector();
 PVector com2d = new PVector();
 int dispHeight;
 int dispWidth;
+float[] data = new float[45];
+
 
 void setup() {
   dispWidth = displayWidth;
@@ -69,6 +71,7 @@ void draw() {
         drawSkeleton(userList[i]);
         if (userList.length == 1) {
           sendOSCSkeleton(userList[i]);
+          getJointCoordinates(userList[i]);
         }
       }      
       // draw the center of mass
@@ -274,7 +277,6 @@ void oscEvent(OscMessage theOscMessage) {
 //    println("ClassPrediction/MRC:\t" + Integer.toString(classPrediction) + "/" + Integer.toString(MRC));
     if(true) {
       if(MRC != classPrediction) {
-        println("TRIGGER ANIMATION");
         int x_coor = (int) (Math.random() * (dispWidth-100));
         int y_coor = (int) (Math.random() * (dispHeight-100));
         eyeList.add(new Eye(x_coor, y_coor, 200));
@@ -389,3 +391,110 @@ private void OpenNI_DrawCameraImage() {
   }
 }
 
+private void sendJointCoordinates(float[] data) {
+  // Create the OSC Message with target address
+  OscMessage msg = new OscMessage("/Data");
+  msg.add(data);
+  // Send OSC message
+  oscP5.send(msg, new NetAddress("127.0.0.1", 5000));
+}
+
+private void getJointCoordinates(int inUserID) {
+  
+  PVector head = new PVector();
+  float confidenceH = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_HEAD, head);
+  PVector neck = new PVector();
+  float confidenceN = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_NECK, neck);
+  PVector torso = new PVector();
+  float confidenceT = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_HEAD, torso);
+  
+  PVector leftShoulder = new PVector();
+  float confidenceLShoulder = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_LEFT_SHOULDER, leftShoulder);
+  PVector leftElbow = new PVector();
+  float confidenceLElbow = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_LEFT_ELBOW, leftElbow);
+  PVector leftHand = new PVector();
+  float confidenceLHand = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_LEFT_HAND, leftHand);
+  
+  PVector rightShoulder = new PVector();
+  float confidenceRShoulder = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_RIGHT_SHOULDER, rightShoulder);
+  PVector rightElbow = new PVector();
+  float confidenceRElbow = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_RIGHT_ELBOW, rightElbow);
+  PVector rightHand = new PVector();
+  float confidenceRHand = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_RIGHT_HAND, rightHand); 
+  
+  PVector leftHip = new PVector();
+  float confidenceLHip = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_LEFT_HIP, leftHip);
+  PVector leftKnee = new PVector();
+  float confidenceLKnee = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_LEFT_KNEE, leftKnee);
+  PVector leftFoot = new PVector();
+  float confidenceLFoot = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_LEFT_FOOT, leftFoot);
+  
+  PVector rightHip = new PVector();
+  float confidenceRHip = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_RIGHT_HIP, rightHip);
+  PVector rightKnee = new PVector();
+  float confidenceRKnee = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_RIGHT_KNEE, rightKnee);
+  PVector rightFoot = new PVector();
+  float confidenceRFoot = kinect.getJointPositionSkeleton(inUserID, SimpleOpenNI.SKEL_RIGHT_FOOT, rightFoot);
+  
+  data[0] = head.x;
+  data[1] = head.y;
+  data[2] = head.z;
+  
+  data[3] = neck.x;
+  data[4] = neck.y;
+  data[5] = neck.z;
+  
+  data[6] = torso.x;
+  data[7] = torso.y;
+  data[8] = torso.z;
+  
+  data[9] = leftShoulder.x;
+  data[10] = leftShoulder.y;
+  data[11] = leftShoulder.z;
+  
+  data[12] = leftElbow.x;
+  data[13] = leftElbow.y;
+  data[14] = leftElbow.z;
+  
+  data[15] = leftHand.x;
+  data[16] = leftHand.y;
+  data[17] = leftHand.z;
+  
+  data[18] = rightShoulder.x;
+  data[19] = rightShoulder.y;
+  data[20] = rightShoulder.z;
+  
+  data[21] = rightElbow.x;
+  data[22] = rightElbow.y;
+  data[23] = rightElbow.z;
+  
+  data[24] = rightHand.x;
+  data[25] = rightHand.y;
+  data[26] = rightHand.z;
+  
+  data[27] = leftHip.x;
+  data[28] = leftHip.y;
+  data[29] = leftHip.z;
+  
+  data[30] = leftKnee.x;
+  data[31] = leftKnee.y;
+  data[32] = leftKnee.z;
+  
+  data[33] = leftFoot.x;
+  data[34] = leftFoot.y;
+  data[35] = leftFoot.z;
+  
+  data[36] = rightHip.x;
+  data[37] = rightHip.y;
+  data[38] = rightHip.z;
+  
+  data[39] = rightKnee.x;
+  data[40] = rightKnee.y;
+  data[41] = rightKnee.z;
+  
+  data[42] = rightFoot.x;
+  data[43] = rightFoot.y;
+  data[44] = rightFoot.z;
+  
+  sendJointCoordinates(data);
+}

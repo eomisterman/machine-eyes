@@ -1,3 +1,8 @@
+/*  Adapted from: Montgomery Martin
+ *  Source: https://support.troikatronix.com/support/solutions/articles/13000014928-isadora-kinect-tracking-tutorial-part-1
+ *  Contributors: Emilio Ovalles-Misterman & Fiona Sullivan
+ */
+
 import SimpleOpenNI.*;
 import oscP5.*;
 import netP5.*;
@@ -5,51 +10,62 @@ import KinectProjectorToolkit.*;
 import java.util.*;
 import java.lang.Math;
 
-// --------------------------------------------------------------------------------
-//  MAIN PROGRAM
-// --------------------------------------------------------------------------------
+PGraphics canvas;
+color[] userClr = new color[]
+{
+  color(255, 0, 0), 
+  color(0, 255, 0), 
+  color(0, 0, 255), 
+  color(255, 255, 0), 
+  color(255, 0, 255), 
+  color(0, 255, 255)
+};
 
-boolean kDrawSkeleton = true; // << set to true to draw skeleton, false to use Eye animation
-KinectProjectorToolkit kpc;
+int kCameraImage_RGB = 1;                // rgb camera image
+int kCameraImage_IR = 2;                 // infra red camera image
+int kCameraImage_Depth = 3;              // depth without colored bodies of tracked bodies
+int kCameraImage_User = 4;               // depth image with colored bodies of tracked bodies
+int kCameraImageMode = kCameraImage_User; // << Set thie value to one of the kCamerImage constants above
+
+boolean kDrawSkeleton = false; // << set to true to draw skeleton, false to use Eye animation
 int MRC = 1;
 private static ArrayList<Eye> eyeList = new ArrayList<Eye>();
-PVector com = new PVector();
+PVector com = new PVector();  // Center of Mass
 PVector com2d = new PVector();
 int dispHeight;
 int dispWidth;
 float[] data = new float[45];
+SimpleOpenNI kinect;
+OscP5 oscP5;
+NetAddress oscDestinationAddress;
+int oscTransmitPort = 8000;
+int oscListenPort = 9002;
 
 
 void setup() {
   dispWidth = displayWidth;
   dispHeight = displayHeight;
+
   // Set size of window
   size(dispWidth, dispHeight, P3D);
+  
   // Set size of canvas within window
   canvas = createGraphics(dispWidth, dispHeight, P3D);
 
-  println("Setup Canvas");
   if(!kDrawSkeleton) {
     background(0);
   }
   canvas.stroke(0, 0, 255);
   canvas.strokeWeight(3);
   canvas.smooth();
-  println("-- Canvas Setup Complete");
 
   // setup Kinect tracking
-  println("Setup OpenNI");
   setupOpenNI();
   setupOpenNI_CameraImageMode();
 
-  //  setup Kinect Projector Toolkit
-  //  kpc = new KinectProjectorToolkit(this, kinect.depthWidth(), kinect.depthHeight());
-  //  kpc.loadCalibration("/Users/emilio/Documents/Processing/libraries/KinectProjectorToolkit/examples/CALIBRATION/calibration.txt");
-
-  // setup OSC
-  println("Setup OSC");
   setupOSC();
-
+  
+  // Add first eye animation to EyeList
   eyeList.add(new Eye((int)(Math.random() * dispWidth), (int)(Math.random() * dispHeight), 150));
 }
 
@@ -70,45 +86,37 @@ void draw() {
         canvas.stroke(userClr[ (userList[i] - 1) % userClr.length ] );
         drawSkeleton(userList[i]);
         if (userList.length == 1) {
-          sendOSCSkeleton(userList[i]);
           getJointCoordinates(userList[i]);
         }
       }      
-      // draw the center of mass
-      if (kinect.getCoM(userList[i], com)) {
-        kinect.convertRealWorldToProjective(com, com2d);
-        canvas.stroke(100, 255, 0);
-        canvas.strokeWeight(1);
-        canvas.beginShape(LINES);
-        canvas.vertex(com2d.x, com2d.y - 5);
-        canvas.vertex(com2d.x, com2d.y + 5);
-        canvas.vertex(com2d.x - 5, com2d.y);
-        canvas.vertex(com2d.x + 5, com2d.y);
-        canvas.endShape();
-        canvas.fill(0, 255, 100);
-        canvas.text(Integer.toString(userList[i]), com2d.x, com2d.y);
-      }
+      draw the center of mass
+     if (kinect.getCoM(userList[i], com)) {
+       kinect.convertRealWorldToProjective(com, com2d);
+       canvas.stroke(100, 255, 0);
+       canvas.strokeWeight(1);
+       canvas.beginShape(LINES);
+       canvas.vertex(com2d.x, com2d.y - 5);
+       canvas.vertex(com2d.x, com2d.y + 5);
+       canvas.vertex(com2d.x - 5, com2d.y);
+       canvas.vertex(com2d.x + 5, com2d.y);
+       canvas.endShape();
+       canvas.fill(0, 255, 100);
+       canvas.text(Integer.toString(userList[i]), com2d.x, com2d.y);
+     }
     }
   } 
   else {
-//    println("Draw function begin");
     int[] userList = kinect.getUsers();
-//    println("Draw function initialized userList[]");
     for (int i=0; i<userList.length; i++) {
-//      println("Draw function enters for loop...");
-//      println("Index:\t" + Integer.toString(i));
       if (kinect.getCoM(userList[i], com)) {
         kinect.convertRealWorldToProjective(com, com2d);
-//        println("Convert Real World To Projective executed");
       }
-      
       if (userList.length == 1) {
-        sendOSCSkeleton(userList[i]);
-//        println("Osc skeleton sent");
+        getJointCoordinates(userList[i]);
       }
-
-
     }
+    
+    // Update eye positioning
     for(int k=0; k<eyeList.size(); k++) {
       Eye newEye;
       newEye = eyeList.get(k);
@@ -123,119 +131,20 @@ void draw() {
   }
 }
 
-// --------------------------------------------------------------------------------
-//  DRAW SKELETON
-// --------------------------------------------------------------------------------
-
-// draw the skeleton with the selected joints
-void drawSkeleton(int userId) {
-  // println("DRAWING SKELETON");
-  canvas.stroke(255, 255, 255, 255);
-  canvas.strokeWeight(3);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_HEAD, SimpleOpenNI.SKEL_NECK);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_LEFT_SHOULDER);
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_LEFT_ELBOW);
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, SimpleOpenNI.SKEL_LEFT_HAND);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_RIGHT_SHOULDER);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_RIGHT_ELBOW);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, SimpleOpenNI.SKEL_RIGHT_HAND);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_LEFT_HIP);
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_HIP, SimpleOpenNI.SKEL_LEFT_KNEE);
-  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_KNEE, SimpleOpenNI.SKEL_LEFT_FOOT);
-
-  drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_RIGHT_HIP);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_HIP, SimpleOpenNI.SKEL_RIGHT_KNEE);
-  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);
-}
-
-// --------------------------------------------------------------------------------
-//  DRAW LIMBS
-// --------------------------------------------------------------------------------
-
-void drawLimb(int userId, int jointType1, int jointType2) {
-  float  confidence;
-
-  // draw the joint position
-  PVector a_3d = new PVector();
-  confidence = kinect.getJointPositionSkeleton(userId, jointType1, a_3d);
-  PVector b_3d = new PVector();
-  confidence = kinect.getJointPositionSkeleton(userId, jointType2, b_3d);
-
-  PVector a_2d = new PVector();
-  kinect.convertRealWorldToProjective(a_3d, a_2d);
-  PVector b_2d = new PVector();
-  kinect.convertRealWorldToProjective(b_3d, b_2d);
-
-  canvas.line(a_2d.x, a_2d.y, b_2d.x, b_2d.y);
-}
-
-void onNewUser(SimpleOpenNI curContext, int userId)
-{
-//  println("onNewUser - userId: " + userId);
-//  println("\tstart tracking skeleton");
-
+void onNewUser(SimpleOpenNI curContext, int userId) {
   curContext.startTrackingSkeleton(userId);
 }
 
-void onLostUser(SimpleOpenNI curContext, int userId)
-{
-//  println("onLostUser - userId: " + userId);
+private void setupOSC() {
+  // initialize OSC support, listen on post oscTransmitPort
+  oscP5 = new OscP5(this, oscListenPort);
+  oscDestinationAddress = new NetAddress("127.0.0.1", oscTransmitPort);
 }
-
-void onVisibleUser(SimpleOpenNI curContext, int userId)
-{
-  //println("onVisibleUser - userId: " + userId);
-}
-
-void keyPressed()
-{
-  switch(key)
-  {
-  case ' ':
-    kinect.setMirror(!kinect.mirror());
-//    println("Switch Mirroring");
-    break;
-  }
-}
-
-PGraphics canvas;
-color[] userClr = new color[]
-{
-  color(255, 0, 0), 
-  color(0, 255, 0), 
-  color(0, 0, 255), 
-  color(255, 255, 0), 
-  color(255, 0, 255), 
-  color(0, 255, 255)
-};
-
-// --------------------------------------------------------------------------------
-//  CAMERA IMAGE SENT VIA SYPHON
-// --------------------------------------------------------------------------------
-int kCameraImage_RGB = 1;                // rgb camera image
-int kCameraImage_IR = 2;                 // infra red camera image
-int kCameraImage_Depth = 3;              // depth without colored bodies of tracked bodies
-int kCameraImage_User = 4;               // depth image with colored bodies of tracked bodies
-
-int kCameraImageMode = kCameraImage_User; // << Set thie value to one of the kCamerImage constants above
-
-// --------------------------------------------------------------------------------
-//  OPENNI (KINECT) SUPPORT
-// --------------------------------------------------------------------------------
-
-SimpleOpenNI kinect;
 
 private void setupOpenNI() {
   kinect = new SimpleOpenNI(this);
   if (kinect.isInit() == false) {
-//    println("Can't init SimpleOpenNI, maybe the camera is not connected?");
+    println("Can't init SimpleOpenNI, maybe the camera is not connected?");
     exit();
     return;
   }
@@ -248,149 +157,7 @@ private void setupOpenNI() {
   kinect.setMirror(true);
 }
 
-// --------------------------------------------------------------------------------
-//  OSC SUPPORT
-// --------------------------------------------------------------------------------
-
-OscP5 oscP5;
-NetAddress oscDestinationAddress;
-int oscTransmitPort = 8000;
-int oscListenPort = 9002;
-
-private void setupOSC() {
-
-  // initialize OSC support, listen on post oscTransmitPort
-  oscP5 = new OscP5(this, oscListenPort);
-  oscDestinationAddress = new NetAddress("127.0.0.1", oscTransmitPort);
-}
-
-void oscEvent(OscMessage theOscMessage) {
-  int classPrediction;
-  float likelihood;
-  
-//  println("### received an osc message. with address pattern "+theOscMessage.addrPattern());
-//  println(Integer.toString(theOscMessage.get(0).intValue()) + "\t" + Float.toString(theOscMessage.get(1).floatValue()));
-  
-  if(theOscMessage.checkAddrPattern("/Prediction") == true && !kDrawSkeleton) {
-    classPrediction = theOscMessage.get(0).intValue();
-    likelihood = theOscMessage.get(1).floatValue();
-//    println("ClassPrediction/MRC:\t" + Integer.toString(classPrediction) + "/" + Integer.toString(MRC));
-    if(true) {
-      if(MRC != classPrediction) {
-        int x_coor = (int) (Math.random() * (dispWidth-100));
-        int y_coor = (int) (Math.random() * (dispHeight-100));
-        eyeList.add(new Eye(x_coor, y_coor, 200));
-        MRC = classPrediction;
-      }
-    }
-//    if(classPrediction == 3 && likelihood > 0.9) {
-//      if(MRC != classPrediction) {
-//        println("TRIGGER ANIMATION");
-//        int x_coor = (int) (Math.random() * dispWidth);
-//        int y_coor = (int) (Math.random() * dispHeight);
-//        eyeList.add(new Eye(x_coor, y_coor, 100));
-//        MRC = classPrediction;
-//      }
-//    }
-//    if(classPrediction == 7 && likelihood > 0.9) {
-//      if(MRC != classPrediction) {
-//        println("TRIGGER ANIMATION");
-//        int x_coor = (int) (Math.random() * dispWidth);
-//        int y_coor = (int) (Math.random() * dispHeight);
-//        eyeList.add(new Eye(x_coor, y_coor, 100));
-//        MRC = classPrediction;
-//      }
-//    }
-
-  }
-}
-
-private void sendOSCSkeletonPosition(String inAddress, int inUserID, int inJointType) {
-
-  // Create the OSC Message with target address
-  OscMessage msg = new OscMessage(inAddress);
-
-  PVector p = new PVector();
-
-  float confidence = kinect.getJointPositionSkeleton(inUserID, inJointType, p);
-
-  // Add coordinates to the message
-  msg.add(p.x);
-  msg.add(p.y);
-  msg.add(p.z);
-
-  // Send OSC message
-  oscP5.send(msg, oscDestinationAddress);
-}
-
-private void sendOSCSkeleton(int inUserID) {
-
-  // Send OSC message for each joint
-  sendOSCSkeletonPosition("/head", inUserID, SimpleOpenNI.SKEL_HEAD);
-  sendOSCSkeletonPosition("/neck", inUserID, SimpleOpenNI.SKEL_NECK);
-  sendOSCSkeletonPosition("/torso", inUserID, SimpleOpenNI.SKEL_TORSO);
-
-  sendOSCSkeletonPosition("/left_shoulder", inUserID, SimpleOpenNI.SKEL_LEFT_SHOULDER);
-  sendOSCSkeletonPosition("/left_elbow", inUserID, SimpleOpenNI.SKEL_LEFT_ELBOW);
-  sendOSCSkeletonPosition("/left_hand", inUserID, SimpleOpenNI.SKEL_LEFT_HAND);
-
-  sendOSCSkeletonPosition("/right_shoulder", inUserID, SimpleOpenNI.SKEL_RIGHT_SHOULDER);
-  sendOSCSkeletonPosition("/right_elbow", inUserID, SimpleOpenNI.SKEL_RIGHT_ELBOW);
-  sendOSCSkeletonPosition("/right_hand", inUserID, SimpleOpenNI.SKEL_RIGHT_HAND);
-
-  sendOSCSkeletonPosition("/left_hip", inUserID, SimpleOpenNI.SKEL_LEFT_HIP);
-  sendOSCSkeletonPosition("/left_knee", inUserID, SimpleOpenNI.SKEL_LEFT_KNEE);
-  sendOSCSkeletonPosition("/left_foot", inUserID, SimpleOpenNI.SKEL_LEFT_FOOT);
-
-  sendOSCSkeletonPosition("/right_hip", inUserID, SimpleOpenNI.SKEL_RIGHT_HIP);
-  sendOSCSkeletonPosition("/right_knee", inUserID, SimpleOpenNI.SKEL_RIGHT_KNEE);
-  sendOSCSkeletonPosition("/right_foot", inUserID, SimpleOpenNI.SKEL_RIGHT_FOOT);
-}
-
-private void setupOpenNI_CameraImageMode() {
-  println("kCameraImageMode " + kCameraImageMode);
-
-  switch (kCameraImageMode) {
-  case 1: // kCameraImage_RGB:
-    kinect.enableRGB();
-    println("enable RGB");
-    break;
-  case 2: // kCameraImage_IR:
-    kinect.enableIR();
-    println("enable IR");
-    break;
-  case 3: // kCameraImage_Depth:
-    kinect.enableDepth();
-    println("enable Depth");
-    break;
-  case 4: // kCameraImage_User:
-    kinect.enableUser();
-    println("enable User");
-    break;
-  }
-}
-
-private void OpenNI_DrawCameraImage() {
-  switch (kCameraImageMode) {
-  case 1: // kCameraImage_RGB:
-    canvas.image(kinect.rgbImage(), 0, 0);
-    // println("draw RGB");
-    break;
-  case 2: // kCameraImage_IR:
-    canvas.image(kinect.irImage(), 0, 0);
-    // println("draw IR");
-    break;
-  case 3: // kCameraImage_Depth:
-    canvas.image(kinect.depthImage(), 0, 0);
-    //println("draw DEPTH");
-    break;
-  case 4: // kCameraImage_User:
-    canvas.image(kinect.userImage(), 0, 0);
-    // println("draw DEPTH");
-    break;
-  }
-}
-
+// Send OCS Message to GRT
 private void sendJointCoordinates(float[] data) {
   // Create the OSC Message with target address
   OscMessage msg = new OscMessage("/Data");
@@ -399,6 +166,7 @@ private void sendJointCoordinates(float[] data) {
   oscP5.send(msg, new NetAddress("127.0.0.1", 5000));
 }
 
+// Preparing outgoing OSC Message
 private void getJointCoordinates(int inUserID) {
   
   PVector head = new PVector();
@@ -497,4 +265,112 @@ private void getJointCoordinates(int inUserID) {
   data[44] = rightFoot.z;
   
   sendJointCoordinates(data);
+}
+
+// Receiving OSC Message
+void oscEvent(OscMessage theOscMessage) {
+  int classPrediction;
+  float likelihood;
+
+  if(theOscMessage.checkAddrPattern("/Prediction") == true && !kDrawSkeleton) {
+    classPrediction = theOscMessage.get(0).intValue();
+    likelihood = theOscMessage.get(1).floatValue();
+    if(true) {
+      if(MRC != classPrediction) {
+        MRC = classPrediction;
+        if(classPrediction != 8) {
+          int x_coor = (int) (Math.random() * (dispWidth-100));
+          int y_coor = (int) (Math.random() * (dispHeight-100));
+          eyeList.add(new Eye(x_coor, y_coor, 200));
+        }
+      }
+    }
+  }
+}
+
+void drawSkeleton(int userId) {
+  canvas.stroke(255, 255, 255, 255);
+  canvas.strokeWeight(3);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_HEAD, SimpleOpenNI.SKEL_NECK);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_LEFT_SHOULDER);
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_LEFT_ELBOW);
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, SimpleOpenNI.SKEL_LEFT_HAND);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_RIGHT_SHOULDER);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_RIGHT_ELBOW);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, SimpleOpenNI.SKEL_RIGHT_HAND);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_LEFT_HIP);
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_HIP, SimpleOpenNI.SKEL_LEFT_KNEE);
+  drawLimb(userId, SimpleOpenNI.SKEL_LEFT_KNEE, SimpleOpenNI.SKEL_LEFT_FOOT);
+
+  drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_RIGHT_HIP);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_HIP, SimpleOpenNI.SKEL_RIGHT_KNEE);
+  drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);
+}
+
+void drawLimb(int userId, int jointType1, int jointType2) {
+  float  confidence;
+
+  // draw the joint position
+  PVector a_3d = new PVector();
+  confidence = kinect.getJointPositionSkeleton(userId, jointType1, a_3d);
+  PVector b_3d = new PVector();
+  confidence = kinect.getJointPositionSkeleton(userId, jointType2, b_3d);
+
+  PVector a_2d = new PVector();
+  kinect.convertRealWorldToProjective(a_3d, a_2d);
+  PVector b_2d = new PVector();
+  kinect.convertRealWorldToProjective(b_3d, b_2d);
+
+  canvas.line(a_2d.x, a_2d.y, b_2d.x, b_2d.y);
+}
+
+private void setupOpenNI_CameraImageMode() {
+  println("kCameraImageMode " + kCameraImageMode);
+
+  switch (kCameraImageMode) {
+  case 1: // kCameraImage_RGB:
+    kinect.enableRGB();
+    println("enable RGB");
+    break;
+  case 2: // kCameraImage_IR:
+    kinect.enableIR();
+    println("enable IR");
+    break;
+  case 3: // kCameraImage_Depth:
+    kinect.enableDepth();
+    println("enable Depth");
+    break;
+  case 4: // kCameraImage_User:
+    kinect.enableUser();
+    println("enable User");
+    break;
+  }
+}
+
+private void OpenNI_DrawCameraImage() {
+  switch (kCameraImageMode) {
+  case 1: // kCameraImage_RGB:
+    canvas.image(kinect.rgbImage(), 0, 0);
+    // println("draw RGB");
+    break;
+  case 2: // kCameraImage_IR:
+    canvas.image(kinect.irImage(), 0, 0);
+    // println("draw IR");
+    break;
+  case 3: // kCameraImage_Depth:
+    canvas.image(kinect.depthImage(), 0, 0);
+    //println("draw DEPTH");
+    break;
+  case 4: // kCameraImage_User:
+    canvas.image(kinect.userImage(), 0, 0);
+    // println("draw DEPTH");
+    break;
+  }
 }
